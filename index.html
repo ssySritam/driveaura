@@ -1,0 +1,1527 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <title>DriveLux — Explore Real Cars with AI</title>
+    <meta name="description" content="Cinematic car explorer with 3D effects, smooth animations, smart search, infinite scroll, wishlist, rich data, and AI insights — all in a single file." />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
+    <!-- Three.js for 3D background -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+    <!-- Optional: GLTF loader (kept here for future expansion; not required for current primitives) -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/loaders/GLTFLoader.js"></script>
+    <style>
+        :root {
+            /* Core palette */
+            --bg: #0b0f14;
+            --bg-2: #0f141b;
+            --surface: rgba(255,255,255,0.06);
+            --surface-2: rgba(255,255,255,0.1);
+            --text: #e7edf5;
+            --muted: #b7c3d1;
+            --accent: #61dafb;
+            --accent-2: #8af5f2;
+            --brand: #00d1b2;
+            --danger: #ff5d6c;
+            --warning: #ffd56b;
+            --success: #68e0a9;
+            --shadow: rgba(0,0,0,0.35);
+            /* Elevation + glass */
+            --glass: backdrop-filter: saturate(160%) blur(16px);
+            --radius: 18px;
+            --radius-sm: 12px;
+            --radius-xs: 10px;
+            /* Motion */
+            --fast: 160ms;
+            --mid: 280ms;
+            --slow: 520ms;
+            /* Z stack */
+            --z-3d: 0;
+            --z-bg: 1;
+            --z-content: 2;
+            --z-header: 3;
+            --z-modal: 4;
+            --z-toast: 5;
+        }
+
+        /* Optional themes */
+        .theme-dark {
+            --bg: #0b0f14;
+            --bg-2: #0f141b;
+            --surface: rgba(255,255,255,0.06);
+            --surface-2: rgba(255,255,255,0.1);
+            --text: #e7edf5;
+            --muted: #b7c3d1;
+            --accent: #61dafb;
+            --accent-2: #8af5f2;
+            --brand: #00d1b2;
+            --danger: #ff5d6c;
+            --warning: #ffd56b;
+            --success: #68e0a9;
+        }
+
+        .theme-neon {
+            --bg: #030712;
+            --bg-2: #061426;
+            --surface: rgba(0,255,255,0.08);
+            --surface-2: rgba(0,255,255,0.16);
+            --text: #eaffff;
+            --muted: #a9e3e8;
+            --accent: #00f0ff;
+            --accent-2: #ff00f0;
+            --brand: #9dff00;
+            --danger: #ff2d75;
+            --warning: #ffd362;
+            --success: #00ffa3;
+        }
+
+        .theme-sunset {
+            --bg: #111016;
+            --bg-2: #1a1523;
+            --surface: rgba(255,172,115,0.08);
+            --surface-2: rgba(255,172,115,0.16);
+            --text: #fff8f0;
+            --muted: #ffd6b7;
+            --accent: #ff9c6e;
+            --accent-2: #b07cff;
+            --brand: #ffce5f;
+            --danger: #ff5c5c;
+            --warning: #ffc06d;
+            --success: #79e48a;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100%;
+            background: radial-gradient(1200px 600px at 20% -10%, #162031 0%, var(--bg) 25%) fixed;
+            color: var(--text);
+            font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+            overflow-x: hidden;
+        }
+
+        body {
+            margin: 0;
+            display: grid;
+            grid-template-rows: auto 1fr;
+            grid-template-columns: 100%;
+        }
+
+        /* Animated 3D canvas backdrop */
+        #bg3d {
+            position: fixed;
+            inset: 0;
+            z-index: var(--z-3d);
+            pointer-events: none;
+        }
+
+        /* Header */
+        header {
+            position: sticky;
+            top: 0;
+            z-index: var(--z-header);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 16px 24px;
+            background: linear-gradient(180deg, rgba(0,0,0,0.35), rgba(0,0,0,0.15));
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            backdrop-filter: blur(14px);
+        }
+
+        .branding {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, var(--accent) 0%, var(--brand) 45%, transparent 46%), linear-gradient(135deg, var(--accent) 0%, var(--brand) 100%);
+            box-shadow: 0 0 18px var(--accent-2);
+            animation: pulse 3.4s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%,100% {
+                transform: scale(1)
+            }
+
+            50% {
+                transform: scale(1.08)
+            }
+        }
+
+        .title {
+            font-weight: 800;
+            letter-spacing: 0.3px;
+            font-size: 18px;
+        }
+
+        .actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        /* Buttons */
+        .btn {
+            border: 0;
+            padding: 10px 14px;
+            border-radius: var(--radius-xs);
+            color: var(--text);
+            background: var(--surface);
+            box-shadow: 0 4px 18px var(--shadow);
+            transition: transform var(--fast) ease, box-shadow var(--fast) ease, background var(--fast) ease, color var(--fast) ease;
+            cursor: pointer;
+        }
+
+            .btn:hover {
+                transform: translateY(-1px);
+                box-shadow: 0 8px 28px var(--shadow);
+                background: var(--surface-2);
+            }
+
+            .btn.primary {
+                background: linear-gradient(135deg, var(--brand) 0%, var(--accent) 100%);
+                color: #071218;
+            }
+
+            .btn.danger {
+                background: linear-gradient(135deg, var(--danger) 0%, #ff9aa2 100%);
+                color: #1a0c0e;
+            }
+
+            .btn.ghost {
+                background: transparent;
+                border: 1px dashed rgba(255,255,255,0.2);
+            }
+
+        /* Search bar + suggestions */
+        .searchbar {
+            display: grid;
+            grid-template-columns: 1fr auto auto;
+            gap: 10px;
+            align-items: center;
+            width: min(1080px, 96vw);
+            margin: 24px auto 12px;
+            padding: 12px;
+            border-radius: var(--radius);
+            background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.04));
+            border: 1px solid rgba(255,255,255,0.12);
+            backdrop-filter: blur(14px);
+            box-shadow: 0 10px 34px var(--shadow);
+        }
+
+            .searchbar input {
+                width: 100%;
+                padding: 12px 14px;
+                border-radius: var(--radius-xs);
+                border: 1px solid rgba(255,255,255,0.12);
+                outline: none;
+                background: rgba(255,255,255,0.04);
+                color: var(--text);
+                transition: border var(--fast) ease, background var(--fast) ease;
+            }
+
+                .searchbar input:focus {
+                    border-color: var(--accent);
+                    background: rgba(255,255,255,0.06);
+                }
+
+        .chips {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .chip {
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.12);
+            font-size: 12px;
+            cursor: pointer;
+            transition: transform var(--fast) ease, background var(--fast) ease;
+        }
+
+            .chip:hover {
+                transform: translateY(-1px);
+                background: rgba(255,255,255,0.12);
+            }
+
+        .suggestions {
+            position: absolute;
+            width: min(720px, 92vw);
+            margin: 0 auto;
+            left: 0;
+            right: 0;
+            transform: translateY(4px);
+            z-index: var(--z-content);
+            border-radius: var(--radius-sm);
+            overflow: hidden;
+            background: rgba(0,0,0,0.55);
+            border: 1px solid rgba(255,255,255,0.14);
+            backdrop-filter: blur(14px);
+            box-shadow: 0 8px 28px var(--shadow);
+            display: none;
+        }
+
+            .suggestions.visible {
+                display: block;
+            }
+
+            .suggestions .item {
+                padding: 10px 14px;
+                border-bottom: 1px solid rgba(255,255,255,0.08);
+                cursor: pointer;
+                font-size: 14px;
+            }
+
+                .suggestions .item:hover {
+                    background: rgba(255,255,255,0.08);
+                }
+
+        /* Grid */
+        .grid {
+            width: min(1280px, 96vw);
+            margin: 16px auto 80px;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 18px;
+        }
+
+        .card {
+            position: relative;
+            border-radius: var(--radius);
+            overflow: hidden;
+            background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.04));
+            border: 1px solid rgba(255,255,255,0.12);
+            box-shadow: 0 14px 38px var(--shadow);
+            transition: transform var(--mid) ease, box-shadow var(--mid) ease, border var(--mid) ease;
+        }
+
+            .card:hover {
+                transform: translateY(-6px);
+                box-shadow: 0 28px 56px var(--shadow);
+                border-color: rgba(255,255,255,0.2);
+            }
+
+            .card .img-wrap {
+                position: relative;
+                height: 180px;
+                background: #0d131a;
+                overflow: hidden;
+            }
+
+            .card img {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                transform: scale(1.06);
+                transition: transform 640ms ease;
+                filter: saturate(1.18) contrast(1.08);
+            }
+
+            .card:hover img {
+                transform: scale(1.12);
+            }
+
+            .card .badge {
+                position: absolute;
+                top: 10px;
+                left: 10px;
+                padding: 6px 10px;
+                border-radius: 12px;
+                background: rgba(0,0,0,0.48);
+                border: 1px solid rgba(255,255,255,0.14);
+                backdrop-filter: blur(10px);
+                font-size: 11px;
+            }
+
+            .card .content {
+                padding: 14px;
+                display: grid;
+                gap: 10px;
+            }
+
+        .specs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px 12px;
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+            .specs .spec {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            }
+
+        .card .actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        /* Detail panel */
+        .detail-panel {
+            position: fixed;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            width: min(540px, 96vw);
+            transform: translateX(102%);
+            transition: transform var(--slow) cubic-bezier(0.16, 1, 0.3, 1);
+            background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.04));
+            border-left: 1px solid rgba(255,255,255,0.12);
+            backdrop-filter: blur(18px);
+            box-shadow: -20px 0 50px var(--shadow);
+            z-index: var(--z-modal);
+            display: grid;
+            grid-template-rows: auto auto 1fr auto;
+        }
+
+            .detail-panel.open {
+                transform: translateX(0);
+            }
+
+        .detail-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 16px;
+            border-bottom: 1px solid rgba(255,255,255,0.12);
+        }
+
+        .detail-body {
+            padding: 16px;
+            overflow-y: auto;
+            display: grid;
+            gap: 16px;
+        }
+
+        .detail-tabs {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            padding: 12px 16px;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+        }
+
+        .tab {
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.06);
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+            .tab.active {
+                background: linear-gradient(135deg, var(--brand) 0%, var(--accent) 100%);
+                color: #071218;
+            }
+
+        .detail-footer {
+            padding: 16px;
+            border-top: 1px solid rgba(255,255,255,0.12);
+            display: flex;
+            gap: 8px;
+        }
+
+        /* Auth modal */
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(6px);
+            display: none;
+            z-index: var(--z-modal);
+        }
+
+            .modal-backdrop.open {
+                display: grid;
+                place-items: center;
+            }
+
+        .modal {
+            width: min(480px, 96vw);
+            border-radius: var(--radius);
+            background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.04));
+            border: 1px solid rgba(255,255,255,0.14);
+            box-shadow: 0 24px 64px var(--shadow);
+            overflow: hidden;
+        }
+
+            .modal header {
+                background: none;
+                border: none;
+            }
+
+            .modal .body {
+                padding: 16px;
+                display: grid;
+                gap: 10px;
+            }
+
+            .modal .field {
+                display: grid;
+                gap: 6px;
+            }
+
+            .modal input {
+                padding: 10px 12px;
+                border-radius: var(--radius-xs);
+                border: 1px solid rgba(255,255,255,0.14);
+                background: rgba(255,255,255,0.06);
+                color: var(--text);
+                outline: none;
+            }
+
+        /* Settings panel */
+        .settings {
+            position: fixed;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: min(520px, 96vw);
+            transform: translateX(-102%);
+            transition: transform var(--slow) cubic-bezier(0.16, 1, 0.3, 1);
+            background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.04));
+            border-right: 1px solid rgba(255,255,255,0.12);
+            backdrop-filter: blur(18px);
+            box-shadow: 20px 0 50px var(--shadow);
+            z-index: var(--z-modal);
+            display: grid;
+            grid-template-rows: auto 1fr auto;
+        }
+
+            .settings.open {
+                transform: translateX(0);
+            }
+
+            .settings .body {
+                padding: 16px;
+                display: grid;
+                gap: 12px;
+                overflow-y: auto;
+            }
+
+            .settings .field {
+                display: grid;
+                gap: 6px;
+            }
+
+            .settings input, .settings select, .settings textarea {
+                padding: 10px 12px;
+                border-radius: var(--radius-xs);
+                border: 1px solid rgba(255,255,255,0.14);
+                background: rgba(255,255,255,0.06);
+                color: var(--text);
+                outline: none;
+            }
+
+        /* Toasts */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: var(--z-toast);
+            display: grid;
+            gap: 8px;
+        }
+
+            .toast .item {
+                padding: 10px 14px;
+                border-radius: var(--radius-xs);
+                background: rgba(0,0,0,0.65);
+                border: 1px solid rgba(255,255,255,0.14);
+                backdrop-filter: blur(12px);
+                box-shadow: 0 8px 28px var(--shadow);
+                animation: slideIn var(--mid) ease both;
+            }
+
+        @keyframes slideIn {
+            from {
+                transform: translateY(6px);
+                opacity: 0
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1
+            }
+        }
+
+        /* Footer */
+        footer {
+            width: min(1080px, 96vw);
+            margin: 16px auto 40px;
+            padding: 14px;
+            color: var(--muted);
+        }
+
+        /* Utility */
+        .hidden {
+            display: none !important;
+        }
+
+        .row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .spacer {
+            flex: 1;
+        }
+
+        .kbd {
+            font-size: 11px;
+            padding: 2px 6px;
+            border: 1px solid rgba(255,255,255,0.24);
+            border-radius: 6px;
+            background: rgba(255,255,255,0.06);
+        }
+    </style>
+</head>
+<body class="theme-dark">
+    <canvas id="bg3d" aria-hidden="true"></canvas>
+
+    <header>
+        <div class="branding">
+            <div class="logo" aria-hidden="true"></div>
+            <div class="title">DriveLux</div>
+            <div class="kbd">Single-file • Cinematic</div>
+        </div>
+        <div class="actions">
+            <button class="btn" id="btnTheme">Switch theme</button>
+            <button class="btn" id="btnSettings">Settings</button>
+            <button class="btn" id="btnWishlist">Wishlist</button>
+            <span class="spacer"></span>
+            <span id="userBadge" class="kbd hidden"></span>
+            <button class="btn primary" id="btnLogin">Login</button>
+            <button class="btn ghost hidden" id="btnLogout">Logout</button>
+        </div>
+    </header>
+
+    <!-- Search bar -->
+    <section class="searchbar">
+        <input id="searchInput" type="text" placeholder="Search cars by brand, model, year, type... (Ctrl+/ to focus)" autocomplete="off" />
+        <button class="btn" id="btnClear">Clear</button>
+        <button class="btn primary" id="btnAI">Ask AI about this</button>
+        <div class="chips" id="chips">
+            <!-- brand chips populated dynamically -->
+        </div>
+    </section>
+    <div id="suggestions" class="suggestions" role="listbox" aria-label="Search suggestions"></div>
+
+    <!-- Grid -->
+    <main class="grid" id="grid"></main>
+    <div id="sentinel" style="height: 48px;"></div>
+
+    <!-- Detail panel -->
+    <aside class="detail-panel" id="detailPanel" aria-label="Car details">
+        <div class="detail-head">
+            <div class="row">
+                <div class="logo" style="width:28px;height:28px;"></div>
+                <strong id="detailTitle">—</strong>
+            </div>
+            <button class="btn" id="btnCloseDetail">Close</button>
+        </div>
+        <div class="detail-tabs" id="detailTabs">
+            <div class="tab active" data-tab="overview">Overview</div>
+            <div class="tab" data-tab="specs">Specs</div>
+            <div class="tab" data-tab="history">History</div>
+            <div class="tab" data-tab="market">Market</div>
+            <div class="tab" data-tab="ai">AI insights</div>
+        </div>
+        <div class="detail-body">
+            <div id="tab-overview"></div>
+            <div id="tab-specs" class="hidden"></div>
+            <div id="tab-history" class="hidden"></div>
+            <div id="tab-market" class="hidden"></div>
+            <div id="tab-ai" class="hidden"></div>
+        </div>
+        <div class="detail-footer">
+            <button class="btn primary" id="btnAddWishlist">Add to wishlist</button>
+            <button class="btn" id="btnShare">Share</button>
+            <button class="btn danger" id="btnReport">Report</button>
+            <span class="spacer"></span>
+            <div class="kbd">Esc to close</div>
+        </div>
+    </aside>
+
+    <!-- Auth modal -->
+    <div class="modal-backdrop" id="authBackdrop">
+        <div class="modal">
+            <header>
+                <div class="row" style="padding: 12px 16px;">
+                    <strong id="authTitle">Login</strong>
+                    <span class="spacer"></span>
+                    <button class="btn" id="btnCloseAuth">Close</button>
+                </div>
+            </header>
+            <div class="body">
+                <div class="field">
+                    <label>Email</label>
+                    <input id="authEmail" type="email" placeholder="you@example.com" />
+                </div>
+                <div class="field">
+                    <label>Password</label>
+                    <input id="authPassword" type="password" placeholder="••••••••" />
+                </div>
+                <div class="row">
+                    <button class="btn primary" id="btnDoLogin">Login</button>
+                    <button class="btn" id="btnSwitchToSignup">Create account</button>
+                </div>
+                <div class="row" style="justify-content: space-between;">
+                    <small class="muted">By continuing, you agree to the terms.</small>
+                    <button class="btn ghost" id="btnGuest">Continue as guest</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings panel -->
+    <aside class="settings" id="settingsPanel" aria-label="Settings">
+        <div class="detail-head">
+            <strong>Settings</strong>
+            <button class="btn" id="btnCloseSettings">Close</button>
+        </div>
+        <div class="body">
+            <div class="field">
+                <label>Theme</label>
+                <select id="themeSelect">
+                    <option value="theme-dark">Dark</option>
+                    <option value="theme-neon">Neon</option>
+                    <option value="theme-sunset">Sunset</option>
+                </select>
+            </div>
+            <div class="field">
+                <label>AI endpoint URL</label>
+                <input id="aiUrl" placeholder="https://your-ai-endpoint/v1/chat" />
+            </div>
+            <div class="field">
+                <label>AI API key</label>
+                <input id="aiKey" placeholder="sk-..." />
+            </div>
+            <div class="field">
+                <label>Car data API (optional)</label>
+                <input id="carApiUrl" placeholder="https://api.nhtsa.gov/vpic/..." />
+            </div>
+            <div class="field">
+                <label>Smartcar / OEM tokens (optional)</label>
+                <textarea id="oemTokens" rows="3" placeholder="Paste JSON tokens for Smartcar/Mercedes/KBB integrations"></textarea>
+            </div>
+            <div class="row">
+                <button class="btn primary" id="btnSaveSettings">Save</button>
+                <button class="btn" id="btnResetSettings">Reset</button>
+            </div>
+            <div class="field">
+                <label>Developer tips</label>
+                <div class="kbd">Unsplash Source powers real images via query (no key). Add AI URL+Key to enable Insights, Market analysis, and Q&A.</div>
+            </div>
+        </div>
+        <div class="detail-footer">
+            <div class="kbd">Settings saved to localStorage</div>
+        </div>
+    </aside>
+
+    <!-- Toasts -->
+    <div class="toast" id="toast"></div>
+
+    <footer>
+        <div class="row" style="gap:14px;">
+            <div class="kbd">DriveLux • Single-file experience</div>
+            <div class="kbd">Infinite scroll</div>
+            <div class="kbd">Wishlist</div>
+            <div class="kbd">AI</div>
+            <div class="spacer"></div>
+            <small>© 2025 DriveLux</small>
+        </div>
+    </footer>
+
+    <script>
+        /* ==========================================================
+           App state and utilities
+           ========================================================== */
+        const state = {
+            user: null,
+            users: JSON.parse(localStorage.getItem('users') || '[]'),
+            session: JSON.parse(localStorage.getItem('session') || 'null'),
+            wishlist: JSON.parse(localStorage.getItem('wishlist') || '[]'),
+            settings: JSON.parse(localStorage.getItem('settings') || '{}'),
+            data: [],
+            page: 0,
+            pageSize: 20,
+            filtered: [],
+            query: '',
+            brandFilter: null,
+            loading: false,
+            detail: null,
+            aiBusy: false,
+        };
+        if (state.session) state.user = state.session.user;
+
+        /* Toasts */
+        function toast(msg) {
+            const t = document.getElementById('toast');
+            const el = document.createElement('div');
+            el.className = 'item';
+            el.textContent = msg;
+            t.appendChild(el);
+            setTimeout(() => { el.remove(); }, 3600);
+        }
+
+        /* Persist helpers */
+        function persist() {
+            localStorage.setItem('users', JSON.stringify(state.users));
+            localStorage.setItem('session', JSON.stringify(state.session));
+            localStorage.setItem('wishlist', JSON.stringify(state.wishlist));
+            localStorage.setItem('settings', JSON.stringify(state.settings));
+        }
+
+        /* ==========================================================
+           Demo car data (real images via Unsplash Source)
+           Brands, models, specs — extendable and API-pluggable
+           ========================================================== */
+        const seedCars = [
+            { id: 'lambo-aventador', brand: 'Lamborghini', model: 'Aventador SVJ', year: 2020, type: 'Supercar', hp: 759, torqueNm: 720, drivetrain: 'AWD', zeroTo100: 2.8, topSpeedKmh: 350, msrpUSD: 517000, imgQuery: 'lamborghini aventador svj' },
+            { id: 'ferrari-488', brand: 'Ferrari', model: '488 Pista', year: 2019, type: 'Supercar', hp: 711, torqueNm: 770, drivetrain: 'RWD', zeroTo100: 2.8, topSpeedKmh: 340, msrpUSD: 350000, imgQuery: 'ferrari 488 pista' },
+            { id: 'porsche-911gt3', brand: 'Porsche', model: '911 GT3', year: 2021, type: 'Sports', hp: 502, torqueNm: 470, drivetrain: 'RWD', zeroTo100: 3.4, topSpeedKmh: 318, msrpUSD: 161100, imgQuery: 'porsche 911 gt3' },
+            { id: 'bugatti-chiron', brand: 'Bugatti', model: 'Chiron', year: 2018, type: 'Hypercar', hp: 1479, torqueNm: 1600, drivetrain: 'AWD', zeroTo100: 2.4, topSpeedKmh: 420, msrpUSD: 3000000, imgQuery: 'bugatti chiron' },
+            { id: 'tesla-models', brand: 'Tesla', model: 'Model S Plaid', year: 2022, type: 'EV', hp: 1020, torqueNm: 1200, drivetrain: 'AWD', zeroTo100: 2.0, topSpeedKmh: 322, msrpUSD: 108490, imgQuery: 'tesla model s plaid' },
+            { id: 'bmw-m3', brand: 'BMW', model: 'M3 Competition', year: 2023, type: 'Sports', hp: 503, torqueNm: 650, drivetrain: 'AWD', zeroTo100: 3.8, topSpeedKmh: 290, msrpUSD: 77295, imgQuery: 'bmw m3 competition' },
+            { id: 'mercedes-amg-gt', brand: 'Mercedes-AMG', model: 'GT R', year: 2020, type: 'Sports', hp: 577, torqueNm: 700, drivetrain: 'RWD', zeroTo100: 3.6, topSpeedKmh: 318, msrpUSD: 163000, imgQuery: 'mercedes amg gt r' },
+            { id: 'audi-r8', brand: 'Audi', model: 'R8 V10 Performance', year: 2020, type: 'Supercar', hp: 602, torqueNm: 560, drivetrain: 'AWD', zeroTo100: 3.3, topSpeedKmh: 331, msrpUSD: 208100, imgQuery: 'audi r8 v10 performance' },
+            { id: 'nissan-gt-r', brand: 'Nissan', model: 'GT-R NISMO', year: 2020, type: 'Sports', hp: 600, torqueNm: 652, drivetrain: 'AWD', zeroTo100: 2.9, topSpeedKmh: 315, msrpUSD: 210000, imgQuery: 'nissan gtr nismo' },
+            { id: 'ford-gt', brand: 'Ford', model: 'GT', year: 2019, type: 'Supercar', hp: 647, torqueNm: 746, drivetrain: 'RWD', zeroTo100: 3.0, topSpeedKmh: 348, msrpUSD: 500000, imgQuery: 'ford gt supercar' },
+            { id: 'chevrolet-corvette', brand: 'Chevrolet', model: 'Corvette C8 Z06', year: 2023, type: 'Sports', hp: 670, torqueNm: 623, drivetrain: 'RWD', zeroTo100: 2.9, topSpeedKmh: 315, msrpUSD: 110000, imgQuery: 'chevrolet corvette c8 z06' },
+            { id: 'toyota-supra', brand: 'Toyota', model: 'GR Supra', year: 2021, type: 'Sports', hp: 382, torqueNm: 500, drivetrain: 'RWD', zeroTo100: 4.1, topSpeedKmh: 250, msrpUSD: 50990, imgQuery: 'toyota supra gr' },
+            { id: 'mclaren-720s', brand: 'McLaren', model: '720S', year: 2019, type: 'Supercar', hp: 710, torqueNm: 770, drivetrain: 'RWD', zeroTo100: 2.8, topSpeedKmh: 341, msrpUSD: 299000, imgQuery: 'mclaren 720s' },
+            { id: 'aston-db11', brand: 'Aston Martin', model: 'DB11 AMR', year: 2020, type: 'GT', hp: 630, torqueNm: 700, drivetrain: 'RWD', zeroTo100: 3.7, topSpeedKmh: 335, msrpUSD: 225000, imgQuery: 'aston martin db11 amr' },
+            { id: 'rolls-phantom', brand: 'Rolls-Royce', model: 'Phantom', year: 2020, type: 'Luxury', hp: 563, torqueNm: 900, drivetrain: 'RWD', zeroTo100: 5.1, topSpeedKmh: 250, msrpUSD: 450000, imgQuery: 'rolls royce phantom' },
+            { id: 'koenigsegg-jesko', brand: 'Koenigsegg', model: 'Jesko', year: 2021, type: 'Hypercar', hp: 1281, torqueNm: 1000, drivetrain: 'RWD', zeroTo100: 2.5, topSpeedKmh: 482, msrpUSD: 3000000, imgQuery: 'koenigsegg jesko' },
+            { id: 'pagani-huayra', brand: 'Pagani', model: 'Huayra BC', year: 2017, type: 'Hypercar', hp: 745, torqueNm: 1000, drivetrain: 'RWD', zeroTo100: 2.9, topSpeedKmh: 370, msrpUSD: 2800000, imgQuery: 'pagani huayra bc' },
+            { id: 'bmw-i8', brand: 'BMW', model: 'i8', year: 2019, type: 'Hybrid', hp: 369, torqueNm: 570, drivetrain: 'AWD', zeroTo100: 4.4, topSpeedKmh: 250, msrpUSD: 147500, imgQuery: 'bmw i8' },
+            { id: 'mercedes-eqs', brand: 'Mercedes-Benz', model: 'EQS 580', year: 2022, type: 'EV', hp: 516, torqueNm: 855, drivetrain: 'AWD', zeroTo100: 4.3, topSpeedKmh: 210, msrpUSD: 125000, imgQuery: 'mercedes eqs 580' },
+            { id: 'audi-rs6', brand: 'Audi', model: 'RS6 Avant', year: 2021, type: 'Wagon', hp: 591, torqueNm: 800, drivetrain: 'AWD', zeroTo100: 3.6, topSpeedKmh: 305, msrpUSD: 116500, imgQuery: 'audi rs6 avant' },
+        ];
+
+        /* Generate long list for infinite scroll */
+        function generateDataset() {
+            const data = [];
+            const copies = 100; // adjust for density
+            for (let i = 0; i < copies; i++) {
+                for (const c of seedCars) {
+                    const variant = { ...c };
+                    variant.id = `${c.id}-${i}`;
+                    variant.year = c.year - Math.floor(Math.random() * 3);
+                    variant.hp = c.hp + Math.floor((Math.random() - 0.5) * 30);
+                    variant.msrpUSD = Math.round(c.msrpUSD * (0.92 + Math.random() * 0.18));
+                    data.push(variant);
+                }
+            }
+            return data;
+        }
+        state.data = generateDataset();
+
+        /* ==========================================================
+           3D background — stylized car silhouette/lines
+           ========================================================== */
+        (function init3D() {
+            const canvas = document.getElementById('bg3d');
+            const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            const scene = new THREE.Scene();
+            const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 2000);
+            let w, h;
+            function resize() {
+                w = window.innerWidth; h = window.innerHeight;
+                renderer.setSize(w, h);
+                camera.aspect = w / h; camera.updateProjectionMatrix();
+                camera.position.set(0, 0, 28);
+            }
+            window.addEventListener('resize', resize);
+            resize();
+
+            // Ambient gradient fog
+            scene.fog = new THREE.FogExp2(0x0b0f14, 0.022);
+
+            // Lighting
+            const light1 = new THREE.PointLight(0x61dafb, 1.2, 120);
+            light1.position.set(-12, 18, 24);
+            scene.add(light1);
+            const light2 = new THREE.PointLight(0x8af5f2, 0.6, 180);
+            light2.position.set(24, -14, 18);
+            scene.add(light2);
+
+            // Line car silhouette (procedural bezier and tubes)
+            const group = new THREE.Group();
+            scene.add(group);
+
+            function makeTube(points, color = 0x61dafb, radius = 0.05) {
+                const curve = new THREE.CatmullRomCurve3(points);
+                const geom = new THREE.TubeGeometry(curve, 200, radius, 8, false);
+                const mat = new THREE.MeshStandardMaterial({ color, transparent: true, opacity: 0.9, roughness: 0.4, metalness: 0.6 });
+                const mesh = new THREE.Mesh(geom, mat);
+                return mesh;
+            }
+
+            // Stylized car curves (roofline, hood, sides)
+            const roof = makeTube([
+                new THREE.Vector3(-6, 0, 0),
+                new THREE.Vector3(-2, 2.6, 0.3),
+                new THREE.Vector3(2.4, 2.2, -0.1),
+                new THREE.Vector3(6.5, 0.2, 0.2),
+            ], 0x61dafb, 0.08);
+            group.add(roof);
+
+            const hood = makeTube([
+                new THREE.Vector3(-6.5, -0.4, 0),
+                new THREE.Vector3(-3, -0.8, 0.2),
+                new THREE.Vector3(0, -0.6, -0.1),
+                new THREE.Vector3(3.6, -0.3, 0.1),
+                new THREE.Vector3(6.8, -0.6, 0),
+            ], 0x8af5f2, 0.06);
+            group.add(hood);
+
+            const side = makeTube([
+                new THREE.Vector3(-6.8, -1.6, 0),
+                new THREE.Vector3(-3.2, -1.2, 0.2),
+                new THREE.Vector3(0, -1.1, -0.1),
+                new THREE.Vector3(3.8, -1.0, 0.1),
+                new THREE.Vector3(7.0, -1.4, 0),
+            ], 0x00d1b2, 0.07);
+            group.add(side);
+
+            // Wheel halos
+            function wheel(x) {
+                const geo = new THREE.TorusGeometry(1.1, 0.18, 16, 64);
+                const mat = new THREE.MeshStandardMaterial({ color: 0x61dafb, emissive: 0x234, metalness: 0.7, roughness: 0.4, transparent: true, opacity: 0.9 });
+                const m = new THREE.Mesh(geo, mat);
+                m.position.set(x, -1.8, 0.2);
+                return m;
+            }
+            group.add(wheel(-3.6));
+            group.add(wheel(3.8));
+
+            group.rotation.x = -0.06;
+            group.rotation.y = 0.18;
+
+            let t = 0;
+            function animate() {
+                requestAnimationFrame(animate);
+                t += 0.005;
+                group.rotation.y = 0.18 + Math.sin(t) * 0.06;
+                group.position.y = Math.sin(t * 1.6) * 0.2;
+                group.position.x = Math.cos(t * 0.8) * 0.12;
+                renderer.render(scene, camera);
+            }
+            animate();
+        })();
+
+        /* ==========================================================
+           Rendering helpers
+           ========================================================== */
+        const grid = document.getElementById('grid');
+        const suggestions = document.getElementById('suggestions');
+        const chips = document.getElementById('chips');
+
+        function carImgUrl(q) {
+            // Unsplash Source: real image by query, no key required
+            return `https://source.unsplash.com/featured/800x600?${encodeURIComponent(q)}&auto=format&fit=crop`;
+        }
+
+        function formatUSD(n) {
+            return '$' + (n).toLocaleString('en-US');
+        }
+
+        function renderBrands() {
+            const brands = Array.from(new Set(seedCars.map(c => c.brand))).sort();
+            chips.innerHTML = '';
+            for (const b of brands) {
+                const el = document.createElement('div');
+                el.className = 'chip';
+                el.textContent = b;
+                el.addEventListener('click', () => {
+                    state.brandFilter = b;
+                    state.page = 0;
+                    applyFilter();
+                    renderPage(true);
+                    toast(`Filter: ${b}`);
+                });
+                chips.appendChild(el);
+            }
+            const clearChip = document.createElement('div');
+            clearChip.className = 'chip';
+            clearChip.textContent = 'Clear filter';
+            clearChip.addEventListener('click', () => {
+                state.brandFilter = null;
+                state.page = 0;
+                applyFilter();
+                renderPage(true);
+                toast('Filter cleared');
+            });
+            chips.appendChild(clearChip);
+        }
+
+        function applyFilter() {
+            const q = state.query.toLowerCase().trim();
+            state.filtered = state.data.filter(c => {
+                const s = `${c.brand} ${c.model} ${c.year} ${c.type}`.toLowerCase();
+                const passQ = q ? s.includes(q) : true;
+                const passB = state.brandFilter ? c.brand === state.brandFilter : true;
+                return passQ && passB;
+            });
+        }
+
+        function renderPage(reset = false) {
+            const start = state.page * state.pageSize;
+            const end = Math.min(start + state.pageSize, state.filtered.length);
+            if (reset) grid.innerHTML = '';
+            for (let i = start; i < end; i++) {
+                const c = state.filtered[i];
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.innerHTML = `
+          <div class="img-wrap">
+            <img src="${carImgUrl(c.imgQuery)}" alt="${c.brand} ${c.model}" />
+            <div class="badge">${c.brand}</div>
+          </div>
+          <div class="content">
+            <div class="row" style="justify-content: space-between;">
+              <strong>${c.model}</strong>
+              <div class="kbd">${c.year}</div>
+            </div>
+            <div class="specs">
+              <div class="spec"><span>Type</span><div class="kbd">${c.type}</div></div>
+              <div class="spec"><span>HP</span><div class="kbd">${c.hp}</div></div>
+              <div class="spec"><span>0–100</span><div class="kbd">${c.zeroTo100}s</div></div>
+              <div class="spec"><span>Top</span><div class="kbd">${c.topSpeedKmh} km/h</div></div>
+              <div class="spec"><span>MSRP</span><div class="kbd">${formatUSD(c.msrpUSD)}</div></div>
+            </div>
+            <div class="actions">
+              <button class="btn" data-action="detail">Details</button>
+              <button class="btn primary" data-action="wishlist">Wishlist</button>
+              <button class="btn ghost" data-action="ai">Ask AI</button>
+            </div>
+          </div>
+        `;
+                const imgWrap = card.querySelector('.img-wrap');
+                imgWrap.addEventListener('click', () => openDetail(c));
+                card.querySelector('[data-action="detail"]').addEventListener('click', () => openDetail(c));
+                card.querySelector('[data-action="wishlist"]').addEventListener('click', () => addWishlist(c));
+                card.querySelector('[data-action="ai"]').addEventListener('click', () => aiDescribe(c));
+                grid.appendChild(card);
+            }
+        }
+
+        /* Infinite scroll */
+        const sentinel = document.getElementById('sentinel');
+        const io = new IntersectionObserver(entries => {
+            for (const e of entries) {
+                if (e.isIntersecting && !state.loading) {
+                    if ((state.page + 1) * state.pageSize < state.filtered.length) {
+                        state.loading = true;
+                        setTimeout(() => {
+                            state.page++;
+                            renderPage(false);
+                            state.loading = false;
+                        }, 300);
+                    }
+                }
+            }
+        });
+        io.observe(sentinel);
+
+        /* ==========================================================
+           Search + suggestions
+           ========================================================== */
+        const searchInput = document.getElementById('searchInput');
+        const btnClear = document.getElementById('btnClear');
+
+        function suggest(q) {
+            const matches = Array.from(new Set(state.data
+                .filter(c => (`${c.brand} ${c.model} ${c.year} ${c.type}`).toLowerCase().includes(q.toLowerCase()))
+                .map(c => `${c.brand} • ${c.model}`)))
+                .slice(0, 8);
+            suggestions.innerHTML = '';
+            if (!matches.length) { suggestions.classList.remove('visible'); return; }
+            for (const m of matches) {
+                const item = document.createElement('div');
+                item.className = 'item';
+                item.textContent = m;
+                item.addEventListener('click', () => {
+                    searchInput.value = m.replace(' • ', ' ');
+                    state.query = searchInput.value;
+                    state.page = 0;
+                    applyFilter();
+                    renderPage(true);
+                    suggestions.classList.remove('visible');
+                });
+                suggestions.appendChild(item);
+            }
+            suggestions.classList.add('visible');
+        }
+
+        let searchDebounce = 0;
+        searchInput.addEventListener('input', () => {
+            const q = searchInput.value;
+            state.query = q;
+            clearTimeout(searchDebounce);
+            searchDebounce = setTimeout(() => {
+                suggest(q);
+                state.page = 0;
+                applyFilter();
+                renderPage(true);
+            }, 160);
+        });
+        searchInput.addEventListener('focus', () => {
+            if (searchInput.value.trim()) suggest(searchInput.value);
+        });
+        document.addEventListener('click', (e) => {
+            if (!suggestions.contains(e.target) && e.target !== searchInput) {
+                suggestions.classList.remove('visible');
+            }
+        });
+        btnClear.addEventListener('click', () => {
+            searchInput.value = '';
+            state.query = '';
+            state.page = 0;
+            applyFilter();
+            renderPage(true);
+            suggestions.classList.remove('visible');
+        });
+
+        /* Keyboard focus */
+        document.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === '/') {
+                searchInput.focus();
+                e.preventDefault();
+            }
+        });
+
+        /* ==========================================================
+           Wishlist
+           ========================================================== */
+        const btnWishlist = document.getElementById('btnWishlist');
+
+        function addWishlist(car) {
+            if (!state.user) { toast('Login to add to wishlist'); openAuth(); return; }
+            if (state.wishlist.find(x => x.id === car.id && x.user === state.user.email)) {
+                toast('Already in wishlist');
+                return;
+            }
+            state.wishlist.push({ ...car, user: state.user.email, ts: Date.now() });
+            persist();
+            toast('Added to wishlist');
+        }
+
+        btnWishlist.addEventListener('click', () => {
+            if (!state.user) { toast('Login to view wishlist'); openAuth(); return; }
+            const items = state.wishlist.filter(x => x.user === state.user.email);
+            if (!items.length) { toast('Wishlist is empty'); return; }
+            // Quick overlay listing via detail panel "market" tab
+            openDetail(items[0]);
+            const tabMarket = document.getElementById('tab-market');
+            const rows = items.map(x => `<div class="row" style="justify-content: space-between;">
+        <div>${x.brand} — <strong>${x.model}</strong> <span class="kbd">${x.year}</span></div>
+        <div class="row"><div class="kbd">${formatUSD(x.msrpUSD)}</div>
+          <button class="btn danger" data-remove="${x.id}">Remove</button></div>
+      </div>`).join('');
+            tabMarket.innerHTML = `
+        <h3>Your wishlist</h3>
+        <div style="display:grid; gap:8px;">${rows}</div>
+      `;
+            tabActivate('market');
+            tabMarket.querySelectorAll('[data-remove]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const id = btn.getAttribute('data-remove');
+                    state.wishlist = state.wishlist.filter(it => !(it.id === id && it.user === state.user.email));
+                    persist();
+                    toast('Removed from wishlist');
+                    btn.closest('.row').remove();
+                });
+            });
+        });
+
+        /* ==========================================================
+           Detail panel and tabs
+           ========================================================== */
+        const detailPanel = document.getElementById('detailPanel');
+        const detailTitle = document.getElementById('detailTitle');
+        const btnCloseDetail = document.getElementById('btnCloseDetail');
+        const tabEls = document.querySelectorAll('.tab');
+
+        function openDetail(car) {
+            state.detail = car;
+            detailTitle.textContent = `${car.brand} ${car.model} (${car.year})`;
+            detailPanel.classList.add('open');
+            renderDetail(car);
+        }
+        btnCloseDetail.addEventListener('click', closeDetail);
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeDetail();
+        });
+        function closeDetail() {
+            detailPanel.classList.remove('open');
+            state.detail = null;
+        }
+
+        function tabActivate(id) {
+            tabEls.forEach(el => {
+                const active = el.getAttribute('data-tab') === id;
+                el.classList.toggle('active', active);
+                document.getElementById('tab-' + el.getAttribute('data-tab')).classList.toggle('hidden', !active);
+            });
+        }
+
+        tabEls.forEach(el => {
+            el.addEventListener('click', () => {
+                tabActivate(el.getAttribute('data-tab'));
+            });
+        });
+
+        function renderDetail(c) {
+            const overview = document.getElementById('tab-overview');
+            overview.innerHTML = `
+        <div style="display:grid; gap:10px;">
+          <img src="${carImgUrl(c.imgQuery)}" alt="${c.brand} ${c.model}" style="width:100%; border-radius: 12px;"/>
+          <div class="row" style="gap:14px;">
+            <div class="kbd">Type: ${c.type}</div>
+            <div class="kbd">Drivetrain: ${c.drivetrain}</div>
+            <div class="kbd">MSRP: ${formatUSD(c.msrpUSD)}</div>
+          </div>
+          <p style="color: var(--muted);">
+            A focused blend of performance and design. Explore specs, market context, and AI insights tailored for ${c.brand} ${c.model}.
+          </p>
+        </div>
+      `;
+            const specs = document.getElementById('tab-specs');
+            specs.innerHTML = `
+        <div style="display:grid; gap:10px;">
+          <div class="row" style="gap:12px; flex-wrap:wrap;">
+            <div class="kbd">Horsepower: ${c.hp} hp</div>
+            <div class="kbd">Torque: ${c.torqueNm} Nm</div>
+            <div class="kbd">0–100: ${c.zeroTo100}s</div>
+            <div class="kbd">Top speed: ${c.topSpeedKmh} km/h</div>
+            <div class="kbd">Year: ${c.year}</div>
+            <div class="kbd">Drivetrain: ${c.drivetrain}</div>
+          </div>
+          <small style="color: var(--muted);">Specs are demo values; plug a real API in Settings.</small>
+        </div>
+      `;
+            const history = document.getElementById('tab-history');
+            history.innerHTML = `
+        <div style="display:grid; gap:8px;">
+          <div class="kbd">Ownership: —</div>
+          <div class="kbd">Service records: —</div>
+          <div class="kbd">Accidents: —</div>
+          <small style="color: var(--muted);">Integrate vehicle history via VIN to populate this tab.</small>
+          <div class="row"><button class="btn" id="btnVIN">Decode VIN (demo)</button></div>
+        </div>
+      `;
+            document.getElementById('btnVIN').addEventListener('click', () => {
+                toast('Connect VIN decoder API in Settings to enable history.');
+            });
+
+            const market = document.getElementById('tab-market');
+            market.innerHTML = `
+        <div style="display:grid; gap:8px;">
+          <div class="kbd">Market value (est.): ${formatUSD(Math.round(c.msrpUSD * (0.85 + Math.random() * 0.25)))}</div>
+          <div class="kbd">Demand: ${['High', 'Medium', 'Low'][Math.floor(Math.random() * 3)]}</div>
+          <div class="kbd">Nearby listings: ${Math.floor(Math.random() * 12) + 1}</div>
+          <small style="color: var(--muted);">Hook to pricing APIs for real estimates.</small>
+        </div>
+      `;
+
+            const ai = document.getElementById('tab-ai');
+            ai.innerHTML = `
+        <div style="display:grid; gap:10px;">
+          <div id="aiContent" style="min-height: 90px; color: var(--muted);">Ask AI for performance comparisons, buying advice, or maintenance insights.</div>
+          <div class="row">
+            <input id="aiPrompt" placeholder="Ask: Compare to 911 Turbo S for track days..." style="flex:1; padding:10px; border-radius:10px; border:1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.06); color: var(--text);" />
+            <button class="btn primary" id="btnAskAI">Ask AI</button>
+          </div>
+        </div>
+      `;
+            document.getElementById('btnAskAI').addEventListener('click', () => {
+                const prompt = document.getElementById('aiPrompt').value || `Give concise buyer advice for ${c.brand} ${c.model}.`;
+                aiAsk(`User car: ${c.brand} ${c.model} ${c.year} (${c.type}). Specs: ${c.hp}hp, ${c.torqueNm}Nm, 0-100 ${c.zeroTo100}s, top ${c.topSpeedKmh} km/h, drivetrain ${c.drivetrain}. Prompt: ${prompt}`);
+            });
+
+            tabActivate('overview');
+        }
+
+        /* ==========================================================
+           AI integration (generic endpoint)
+           - Configure URL and key in Settings
+           - Uses simple JSON { messages: [{role:'user', content:'...'}] }
+           ========================================================== */
+        const btnAI = document.getElementById('btnAI');
+        btnAI.addEventListener('click', () => {
+            const c = state.filtered[0];
+            if (!c) { toast('No car selected'); return; }
+            openDetail(c);
+            tabActivate('ai');
+            aiAsk(`You are a car buying assistant. Briefly analyze ${c.brand} ${c.model} ${c.year}, performance and practical use, 2 short paragraphs.`);
+        });
+
+        async function aiAsk(content) {
+            const url = state.settings.aiUrl;
+            const key = state.settings.aiKey;
+            const out = document.getElementById('aiContent');
+            if (!url || !key) { out.textContent = 'Add AI endpoint URL and key in Settings.'; return; }
+            if (state.aiBusy) return;
+            state.aiBusy = true;
+            out.textContent = 'Thinking...';
+            try {
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+                    body: JSON.stringify({
+                        messages: [
+                            { role: 'system', content: 'You are an expert automotive assistant. Keep responses concise, objective, and helpful.' },
+                            { role: 'user', content }
+                        ]
+                    })
+                });
+                const data = await res.json();
+                const text = (data.choices?.[0]?.message?.content) || JSON.stringify(data, null, 2);
+                out.textContent = text;
+            } catch (e) {
+                out.textContent = 'AI request failed. Check your URL/key and CORS settings.';
+            } finally {
+                state.aiBusy = false;
+            }
+        }
+
+        function aiDescribe(car) {
+            openDetail(car);
+            tabActivate('ai');
+            aiAsk(`Summarize the character of ${car.brand} ${car.model} (${car.year}), then recommend ideal buyer profile in 4 bullet points.`);
+        }
+
+        /* ==========================================================
+           Authentication (client-side demo)
+           - Signup/Login persists to localStorage
+           - For production, replace with server auth
+           ========================================================== */
+        const authBackdrop = document.getElementById('authBackdrop');
+        const authTitle = document.getElementById('authTitle');
+        const authEmail = document.getElementById('authEmail');
+        const authPassword = document.getElementById('authPassword');
+        const btnLogin = document.getElementById('btnLogin');
+        const btnLogout = document.getElementById('btnLogout');
+        const btnDoLogin = document.getElementById('btnDoLogin');
+        const btnSwitchToSignup = document.getElementById('btnSwitchToSignup');
+        const btnCloseAuth = document.getElementById('btnCloseAuth');
+        const btnGuest = document.getElementById('btnGuest');
+        const userBadge = document.getElementById('userBadge');
+
+        function openAuth(mode = 'login') {
+            authTitle.textContent = mode === 'signup' ? 'Create account' : 'Login';
+            authBackdrop.classList.add('open');
+        }
+        function closeAuth() { authBackdrop.classList.remove('open'); }
+
+        btnLogin.addEventListener('click', () => openAuth('login'));
+        btnLogout.addEventListener('click', () => {
+            state.session = null; state.user = null; persist();
+            btnLogout.classList.add('hidden');
+            btnLogin.classList.remove('hidden');
+            userBadge.classList.add('hidden');
+            toast('Logged out');
+        });
+
+        btnDoLogin.addEventListener('click', () => {
+            const email = authEmail.value.trim().toLowerCase();
+            const password = authPassword.value.trim();
+            if (!email || !password) { toast('Enter email and password'); return; }
+            const found = state.users.find(u => u.email === email && u.password === password);
+            if (!found) { toast('Account not found. Create one.'); return; }
+            state.session = { user: found, ts: Date.now() };
+            state.user = found;
+            persist();
+            userBadge.textContent = found.email;
+            userBadge.classList.remove('hidden');
+            btnLogin.classList.add('hidden');
+            btnLogout.classList.remove('hidden');
+            toast('Welcome back');
+            closeAuth();
+        });
+        btnSwitchToSignup.addEventListener('click', () => {
+            const email = authEmail.value.trim().toLowerCase();
+            const password = authPassword.value.trim();
+            if (!email || !password) { toast('Enter email and password'); return; }
+            if (state.users.find(u => u.email === email)) { toast('Email already registered'); return; }
+            const user = { email, password, created: Date.now() };
+            state.users.push(user);
+            state.session = { user, ts: Date.now() };
+            state.user = user;
+            persist();
+            userBadge.textContent = user.email;
+            userBadge.classList.remove('hidden');
+            btnLogin.classList.add('hidden');
+            btnLogout.classList.remove('hidden');
+            toast('Account created');
+            closeAuth();
+        });
+        btnCloseAuth.addEventListener('click', closeAuth);
+        btnGuest.addEventListener('click', () => {
+            state.session = { user: { email: 'guest@drivelux.app' }, ts: Date.now() };
+            state.user = state.session.user;
+            persist();
+            userBadge.textContent = 'Guest';
+            userBadge.classList.remove('hidden');
+            btnLogin.classList.add('hidden');
+            btnLogout.classList.remove('hidden');
+            toast('Continuing as guest');
+            closeAuth();
+        });
+
+        /* ==========================================================
+           Settings
+           ========================================================== */
+        const settingsPanel = document.getElementById('settingsPanel');
+        const btnSettings = document.getElementById('btnSettings');
+        const btnCloseSettings = document.getElementById('btnCloseSettings');
+        const themeSelect = document.getElementById('themeSelect');
+        const btnTheme = document.getElementById('btnTheme');
+        const aiUrl = document.getElementById('aiUrl');
+        const aiKey = document.getElementById('aiKey');
+        const carApiUrl = document.getElementById('carApiUrl');
+        const oemTokens = document.getElementById('oemTokens');
+        const btnSaveSettings = document.getElementById('btnSaveSettings');
+        const btnResetSettings = document.getElementById('btnResetSettings');
+
+        btnSettings.addEventListener('click', () => settingsPanel.classList.add('open'));
+        btnCloseSettings.addEventListener('click', () => settingsPanel.classList.remove('open'));
+
+        btnSaveSettings.addEventListener('click', () => {
+            state.settings.theme = themeSelect.value;
+            state.settings.aiUrl = aiUrl.value.trim();
+            state.settings.aiKey = aiKey.value.trim();
+            state.settings.carApiUrl = carApiUrl.value.trim();
+            state.settings.oemTokens = oemTokens.value.trim();
+            persist();
+            applyTheme();
+            toast('Settings saved');
+        });
+        btnResetSettings.addEventListener('click', () => {
+            state.settings = {};
+            persist();
+            themeSelect.value = 'theme-dark';
+            aiUrl.value = '';
+            aiKey.value = '';
+            carApiUrl.value = '';
+            oemTokens.value = '';
+            applyTheme();
+            toast('Settings reset');
+        });
+
+        btnTheme.addEventListener('click', () => {
+            const order = ['theme-dark', 'theme-neon', 'theme-sunset'];
+            const idx = order.indexOf(state.settings.theme || 'theme-dark');
+            const next = order[(idx + 1) % order.length];
+            themeSelect.value = next;
+            state.settings.theme = next;
+            persist();
+            applyTheme();
+            toast(`Theme: ${next.replace('theme-', '')}`);
+        });
+
+        function applyTheme() {
+            document.body.classList.remove('theme-dark', 'theme-neon', 'theme-sunset');
+            document.body.classList.add(state.settings.theme || 'theme-dark');
+        }
+
+        /* ==========================================================
+           Share / Report
+           ========================================================== */
+        const btnShare = document.getElementById('btnShare');
+        const btnReport = document.getElementById('btnReport');
+        btnShare.addEventListener('click', () => {
+            if (!state.detail) { toast('Open a car detail first'); return; }
+            const url = location.origin + location.pathname + `#${state.detail.id}`;
+            navigator.clipboard.writeText(url).then(() => toast('Link copied'));
+        });
+        btnReport.addEventListener('click', () => {
+            toast('Thank you. We will review this entry.');
+        });
+
+        /* ==========================================================
+           Initialize
+           ========================================================== */
+        function init() {
+            // Settings UI prefill
+            themeSelect.value = state.settings.theme || 'theme-dark';
+            aiUrl.value = state.settings.aiUrl || '';
+            aiKey.value = state.settings.aiKey || '';
+            carApiUrl.value = state.settings.carApiUrl || '';
+            oemTokens.value = state.settings.oemTokens || '';
+
+            applyTheme();
+            renderBrands();
+
+            // Session badge
+            if (state.user) {
+                userBadge.textContent = state.user.email === 'guest@drivelux.app' ? 'Guest' : state.user.email;
+                userBadge.classList.remove('hidden');
+                btnLogin.classList.add('hidden');
+                btnLogout.classList.remove('hidden');
+            }
+
+            // Initial filter + first page
+            applyFilter();
+            renderPage(true);
+
+            // Deep-link detail via hash
+            const hash = location.hash.slice(1);
+            if (hash) {
+                const found = state.data.find(c => c.id === hash);
+                if (found) openDetail(found);
+            }
+        }
+
+        init();
+
+        /* ==========================================================
+           Optional: Car API integration hooks (NHTSA vPIC, OEM)
+           Plug your endpoints in Settings and call these helpers.
+           ========================================================== */
+        async function fetchMakesFromAPI() {
+            const api = state.settings.carApiUrl;
+            if (!api) { toast('Set Car API URL in Settings'); return []; }
+            try {
+                const res = await fetch(api);
+                const data = await res.json();
+                return data; // adapt mapping
+            } catch (e) {
+                toast('Car API failed');
+                return [];
+            }
+        }
+
+        /* You can also integrate Smartcar/OEM endpoints here using tokens in settings.
+           Example (pseudo):
+           async function fetchVehicleTelematics(vin) {
+             const tokens = JSON.parse(state.settings.oemTokens || '{}');
+             const res = await fetch('https://smartcar-endpoint', { headers: { Authorization: 'Bearer ' + tokens.smartcar }});
+             return await res.json();
+           }
+        */
+    </script>
+</body>
+</html>
